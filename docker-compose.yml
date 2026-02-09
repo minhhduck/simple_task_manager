@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: tasks_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d tasks_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  dal:
+    build: ./dal-service
+    ports:
+      - "8001:8001"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://user:password@postgres/tasks_db
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  bff:
+    build: ./bff-service
+    ports:
+      - "8000:8000"
+    environment:
+      - DAL_URL=http://dal:8001
+    depends_on:
+      - dal
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:5173"
+    depends_on:
+      - bff
+
+volumes:
+  postgres_data:
